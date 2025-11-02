@@ -1,4 +1,4 @@
-name: 🔒 Windows RDP with Tailscale and VS Code
+name: 🔒 Windows RDP with Tailscale and VS Code (Robust IP Print)
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
       - name: ⬇️ فحص (Checkout) الكود
         uses: actions/checkout@v4
 
-      # 🔑 1. توصيل بـ Tailscale
+      # 🔑 1. توصيل بـ Tailscale (هذه الخطوة هي التي تثبت الأداة)
       - name: 🔒 توصيل بـ Tailscale
         uses: tailscale/github-action@v4
         with:
@@ -20,7 +20,7 @@ jobs:
           tags: tag:github-actions 
           hostname: github-rdp-runner
 
-      # ⚙️ 2. إعداد المستخدم وطباعة بيانات الاتصال (تمت الإضافة هنا)
+      # ⚙️ 2. إعداد المستخدم وطباعة بيانات الاتصال (الخطوة المُعدلة)
       - name: ⚙️ إعداد وطباعة معلومات الاتصال
         run: |
           # بيانات المستخدم
@@ -29,8 +29,14 @@ jobs:
           net user $user $pass /add
           net localgroup administrators $user /add
 
-          # طباعة عنوان IP الخاص بـ Tailscale
-          $tailscaleIP = (C:\ProgramData\Tailscale\tailscale.exe ip -4)
+          # تحديد مسار الأداة Tailscale الذي يتم استخدامه بواسطة GitHub Action
+          $tsPath = (Get-Command tailscale).Source
+          
+          # الانتظار قليلاً لضمان اتصال Tailscale بالكامل (مهم)
+          Start-Sleep -Seconds 5
+          
+          # طباعة عنوان IP الخاص بـ Tailscale باستخدام المسار الكامل
+          $tailscaleIP = (& $tsPath ip -4)
           
           Write-Host "========================================"
           Write-Host "✅ تم التوصيل بنجاح بشبكة Tailscale."
@@ -39,18 +45,18 @@ jobs:
           Write-Host "IP Address (العنوان): $tailscaleIP"
           Write-Host "Username (اسم المستخدم): $user"
           Write-Host "Password (كلمة المرور): $pass"
+          Write-Host "----------------------------------------"
+          Write-Host "💡 تأكد من أن برنامج Tailscale يعمل على جهازك المحلي."
           Write-Host "========================================"
         shell: powershell
         
       # 💻 3. تثبيت VS Code تلقائياً
       - name: 💻 تثبيت Visual Studio Code تلقائياً
         run: |
-          Write-Host "جاري تثبيت VS Code..."
           $url = "https://update.code.visualstudio.com/latest/win32-x64-user/stable"
           $output = "$env:TEMP\VSCodeSetup.exe"
           Invoke-WebRequest -Uri $url -OutFile $output
           & $output /VERYSILENT /NORESTART
-          Write-Host "تم تثبيت VS Code."
         shell: powershell
 
       # ⏸️ 4. إبقاء الآلة الافتراضية قيد التشغيل (للاتصال)
