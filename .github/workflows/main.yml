@@ -1,39 +1,62 @@
-name: Free RDP with VSCode + C++ + Python
+# اسم سير العمل الذي سيظهر في علامة تبويب Actions
+name: 🚀 Windows RDP with VS Code Auto-Install
 
+# متى يتم تشغيل هذا السير العمل
 on:
+  # يسمح بتشغيل السير العمل يدوياً من واجهة GitHub
   workflow_dispatch:
 
 jobs:
-  build:
+  rdp:
+    # تشغيل على أحدث إصدار من Windows
     runs-on: windows-latest
-    timeout-minutes: 360
-
+    
     steps:
-      - name: Enable RDP access
-        run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          net user runneradmin "Admin@123" 
+      - name: ⬇️ فحص (Checkout) الكود
+        uses: actions/checkout@v4
 
-      - name: Install Chocolatey
-        shell: pwsh
-        run: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      - name: 🔑 إعداد (Ngrok) - يجب أن يكون NGROK_AUTH_TOKEN في أسرار المستودع
+        uses: sarisia/actions-ngrok@v0.1.7
+        with:
+          # هذا السطر مهم للاتصال عبر RDP (المنفذ الافتراضي 3389)
+          autoconnect: '3389'
+          # استخدام رمز المصادقة المخزن في أسرار المستودع
+          auth_token: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-      - name: Install VSCode, Python, and C++
-        shell: pwsh
+      - name: ⚙️ إعداد معلومات اتصال RDP (اسم المستخدم وكلمة المرور)
         run: |
-          choco install vscode python mingw -y
-          if (!(Test-Path "C:\Tools")) { mkdir "C:\Tools" }
+          # قم بتغيير كلمة المرور هنا
+          $user = "RDP_User"
+          $pass = "YourStrongPassword123" 
 
-      - name: Show RDP Info
+          # إنشاء مستخدم RDP وتعيين كلمة المرور
+          net user $user $pass /add
+          net localgroup administrators $user /add
+          
+          # عرض معلومات الاتصال في سجلات الإجراءات
+          Write-Host "========================================"
+          Write-Host "RDP User: $user"
+          Write-Host "RDP Password: $pass"
+          Write-Host "========================================"
+        shell: powershell
+        
+      - name: 💻 تثبيت Visual Studio Code تلقائياً
         run: |
-          Write-Host "==============================="
-          Write-Host "✅ RDP is ready!"
-          Write-Host "Username: runneradmin"
-          Write-Host "Password: Admin@123"
-          Write-Host "Use your GitHub Actions IP with port 3389 to connect."
-          Write-Host "==============================="
-          while ($true) { Start-Sleep -Seconds 300 }
+          Write-Host "جاري تنزيل وتثبيت VS Code..."
+          $url = "https://update.code.visualstudio.com/latest/win32-x64-user/stable"
+          $output = "$env:TEMP\VSCodeSetup.exe"
+          
+          # تنزيل الملف باستخدام PowerShell
+          Invoke-WebRequest -Uri $url -OutFile $output
+          
+          # تشغيل التثبيت الصامت (/VERYSILENT) وعدم إعادة التشغيل (/NORESTART)
+          & $output /VERYSILENT /NORESTART
+          Write-Host "تم تثبيت VS Code بنجاح!"
+        shell: powershell
+
+      - name: ⏸️ إبقاء الآلة الافتراضية قيد التشغيل (لمدة تصل إلى 6 ساعات)
+        run: |
+          Write-Host "الآلة جاهزة للاتصال عبر RDP. ستستمر لمدة 6 ساعات كحد أقصى."
+          # الانتظار لمدة 6 ساعات قبل انتهاء الـ Workflow
+          Start-Sleep -Seconds 21600 
+        shell: powershell
